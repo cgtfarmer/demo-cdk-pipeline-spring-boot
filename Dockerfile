@@ -1,68 +1,43 @@
-FROM maven:3.9.6-amazoncorretto-17 AS demo-cdk-pipeline-spring-boot-deps
+# FROM maven:3.9.6-amazoncorretto-17-al2023 AS maven17-npm20
+FROM maven:3.9.6-amazoncorretto-17-al2023 AS demo-cdk-pipeline-spring-boot
 
 ENV LANG=C.UTF-8 \
   APP_HOME=/usr/src/app \
-  MAVEN_CONFIG=/root/.m2 \
-  MAVEN_BUILD_REPO=/usr/share/maven/ref/repository
+  MAVEN_CONFIG=/root/.m2
 
 WORKDIR $APP_HOME
+
+RUN curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+
+RUN yum install -y nodejs
+
+COPY package.json package-lock.json ./
+
+RUN npm install
 
 COPY pom.xml ./
 
 RUN mvn \
   -Dmaven.main.skip \
   -Dmaven.test.skip=true \
-  -Dmaven.repo.local=${MAVEN_BUILD_REPO} \
   clean \
   dependency:resolve-plugins
 
 RUN mvn \
   -Dmaven.main.skip \
   -Dmaven.test.skip=true \
-  -Dmaven.repo.local=${MAVEN_BUILD_REPO} \
   -Dspring-boot.repackage.skip \
   dependency:go-offline
 
-
-FROM maven:3.9.6-amazoncorretto-17 AS demo-cdk-pipeline-spring-boot-build
-
-ENV LANG=C.UTF-8 \
-  APP_HOME=/usr/src/app \
-  MAVEN_CONFIG=/root/.m2 \
-  MAVEN_BUILD_REPO=/usr/share/maven/ref/repository
-
-WORKDIR $APP_HOME
-
-COPY --from=demo-cdk-pipeline-spring-boot-deps ${MAVEN_BUILD_REPO} ${MAVEN_BUILD_REPO}
-
-COPY . .
+COPY src ./src
 
 RUN mvn -Dmaven.main.skip \
   -Dmaven.test.skip=true \
-  -Dmaven.repo.local=${MAVEN_BUILD_REPO} \
+  -Dspring-boot.repackage.skip \
   package
 
+COPY playwright.config.js playwright.config.js
 
-FROM demo-cdk-pipeline-spring-boot-build AS demo-cdk-pipeline-spring-boot-development
-
-ENV LANG=C.UTF-8 \
-  APP_HOME=/usr/src/app \
-  MAVEN_CONFIG=/root/.m2 \
-  MAVEN_BUILD_REPO=/usr/share/maven/ref/repository
-
-CMD mvn spring-boot:run
-
-
-FROM maven:3.9.6-amazoncorretto-17 AS demo-cdk-pipeline-spring-boot
-
-ENV LANG=C.UTF-8 \
-  APP_HOME=/usr/src/app \
-  TARGET_DIR=/usr/src/app/target \
-  MAVEN_CONFIG=/root/.m2 \
-  MAVEN_BUILD_REPO=/usr/share/maven/ref/repository
-
-WORKDIR $APP_HOME
-
-COPY --from=demo-cdk-pipeline-spring-boot-build ${TARGET_DIR}/*.jar ${TARGET_DIR}/
+COPY playwright ./playwright
 
 CMD mvn spring-boot:run
