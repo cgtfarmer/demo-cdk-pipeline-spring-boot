@@ -47,3 +47,5 @@ node_modules
 # Misc
 *.zip
 .DS_Store
+cdk~/
+
